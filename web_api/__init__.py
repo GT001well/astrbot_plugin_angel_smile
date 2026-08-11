@@ -191,17 +191,11 @@ class MemeAPI:
     # ---------- 删除 ----------
 
     async def delete_meme(self):
-        """删除空表情分组；分组内还有变体时拒绝删除（需先删除全部变体）。"""
+        """删除表情分组，连同组内全部变体一次性删除。"""
         payload = await _get_json()
         name = (payload.get("name") or "").strip()
         if not name:
             return _err("缺少表情名")
-        # 变体检查必须走实时文件系统，不能依赖 5 分钟缓存索引：
-        # 文件可能已被外部删除，缓存里的旧变体会导致误判 409。
-        self.storage.invalidate_cache()
-        variants = self.storage.get_variants(name)
-        if variants:
-            return _err(f"表情「{name}」还有 {len(variants)} 个变体，请先删除全部变体", 409)
         removed = self._delete_meme_by_name(name)
         if not removed and not self._has_dedup_trace(name):
             return _err(f"表情不存在: {name}", 404)

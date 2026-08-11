@@ -202,14 +202,14 @@ class TestMemeImage(MemeAPIBaseTestCase):
 
 
 class TestDeleteMeme(MemeAPIBaseTestCase):
-    async def test_delete_single_file_rejected_when_variant_exists(self):
-        """单文件分组也是一个变体，有变体时拒绝删除分组。"""
+    async def test_delete_single_file_with_variant(self):
+        """单文件分组也是变体，删除分组时连带删除。"""
         await self._ingest("坏笑", "red")
         self.request.set_json({"name": "坏笑"})
         resp = await self.api.delete_meme()
         body = _unwrap(resp)
-        self.assertEqual(body["status"], "error")
-        self.assertTrue((self.paths.meme_dir / "坏笑.webp").exists())
+        self.assertEqual(body["status"], "ok")
+        self.assertFalse((self.paths.meme_dir / "坏笑.webp").exists())
 
     async def test_delete_single_file_allowed_when_file_removed(self):
         """分组文件不存在时视为空分组，可删除（幂等清理）。"""
@@ -224,8 +224,8 @@ class TestDeleteMeme(MemeAPIBaseTestCase):
         self.assertEqual(body["status"], "ok")
         self.assertFalse(target.exists())
 
-    async def test_delete_folder_rejected_when_variants_exist(self):
-        """分组有变体时拒绝删除整个分组（需先删变体）。"""
+    async def test_delete_folder_with_variants(self):
+        """分组有变体时删除整个分组（连同全部变体）。"""
         await self._ingest("坏笑", "red")
         await self._ingest("坏笑", "blue")
         self.assertTrue((self.paths.meme_dir / "坏笑").is_dir())
@@ -233,8 +233,8 @@ class TestDeleteMeme(MemeAPIBaseTestCase):
         self.request.set_json({"name": "坏笑"})
         resp = await self.api.delete_meme()
         body = _unwrap(resp)
-        self.assertEqual(body["status"], "error")
-        self.assertTrue((self.paths.meme_dir / "坏笑").is_dir())
+        self.assertEqual(body["status"], "ok")
+        self.assertFalse((self.paths.meme_dir / "坏笑").exists())
 
     async def test_delete_folder_allowed_when_empty(self):
         """分组全空（无变体）时可删除。"""
