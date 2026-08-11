@@ -1,24 +1,51 @@
 <template>
   <n-layout class="layout" has-sider :style="cssVars">
     <!-- 左侧：表情分组导航 -->
-    <n-layout-sider bordered width="260">
+    <n-layout-sider
+      bordered
+      width="260"
+      collapse-mode="width"
+      :collapsed-width="56"
+      show-trigger="bar"
+      :collapsed="collapsed"
+      @collapse="collapsed = true"
+      @expand="collapsed = false"
+    >
       <div class="sidebar-inner">
         <div class="sidebar-header">
-          <div class="brand">表情库</div>
-          <n-button size="small" type="primary" @click="openUpload">
+          <div v-if="!collapsed" class="brand">表情库</div>
+          <n-button
+            v-if="!collapsed"
+            size="small"
+            type="primary"
+            @click="openUpload"
+          >
             <template #icon><Icon icon="lucide:plus" /></template>
             新增
+          </n-button>
+          <n-button
+            v-else
+            size="small"
+            type="primary"
+            circle
+            title="新增"
+            @click="openUpload"
+          >
+            <template #icon><Icon icon="lucide:plus" /></template>
           </n-button>
         </div>
         <n-scrollbar class="sidebar-scroll">
           <n-menu
             :value="selectedName ?? undefined"
             :options="menuOptions"
+            :collapsed="collapsed"
+            :collapsed-width="56"
+            :collapsed-icon-size="20"
             @update:value="selectMeme"
           />
         </n-scrollbar>
         <div class="sidebar-footer">
-          <span class="footer-text">{{ memes.length }} 组 · {{ totalVariants }} 个变体</span>
+          <span v-if="!collapsed" class="footer-text">{{ memes.length }} 组 · {{ totalVariants }} 个变体</span>
         </div>
       </div>
     </n-layout-sider>
@@ -70,7 +97,6 @@
                 重命名
               </n-button>
               <n-popconfirm
-                v-if="variantCount === 0"
                 @positive-click="deleteMeme(selectedName)"
                 :positive-button-props="{ type: 'error' }"
                 positive-text="删除"
@@ -79,14 +105,8 @@
                 <template #trigger>
                   <n-button size="small" type="error">删除分组</n-button>
                 </template>
-                确定删除「{{ selectedName }}」？
+                确定删除「{{ selectedName }}」及其全部 {{ variantCount }} 个变体？
               </n-popconfirm>
-              <n-tooltip v-else>
-                <template #trigger>
-                  <n-button size="small" type="error" disabled>删除分组</n-button>
-                </template>
-                请先删除全部变体
-              </n-tooltip>
               <n-button size="small" type="primary" @click="openVariantUpload">
                 <template #icon><Icon icon="lucide:upload" /></template>
                 添加变体
@@ -319,6 +339,7 @@ const fallbackImage =
 
 const memes = ref<MemeItem[]>([])
 const selectedName = ref<string | null>(null)
+const collapsed = ref(false)
 
 const showUpload = ref(false)
 const showVariantUpload = ref(false)
