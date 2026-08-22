@@ -1,9 +1,7 @@
 <template>
   <n-layout class="layout" has-sider :style="cssVars">
     <!-- 左侧：表情分组导航 -->
-    <n-layout-sider
-      bordered
-      width="260"
+    <n-layout-sider class="glass-sider" width="260"
       collapse-mode="width"
       :collapsed-width="56"
       show-trigger="bar"
@@ -11,8 +9,16 @@
       @collapse="collapsed = true"
       @expand="collapsed = false"
     >
-      <div class="sidebar-inner">
+      <div class="sidebar-inner" :class="{ 'is-collapsed': collapsed }">
         <div class="sidebar-header">
+          <button
+            class="theme-toggle"
+            type="button"
+            :title="isDark ? '切换到光模式' : '切换到暗模式'"
+            @click="toggleTheme()"
+          >
+            <Icon :icon="isDark ? 'lucide:sun' : 'lucide:moon'" />
+          </button>
           <div v-if="!collapsed" class="brand">表情库</div>
           <n-button
             v-if="!collapsed"
@@ -117,7 +123,7 @@
           <n-scrollbar class="content-scroll">
             <div class="variant-grid">
               <div
-                v-for="v in currentVariants"
+                v-for="v in visibleVariants"
                 :key="v.relative"
                 class="variant-card"
                 :class="{ 'is-selected': isSelected(v.relative) }"
@@ -129,11 +135,7 @@
                     object-fit="contain"
                     :fallback-src="fallbackImage"
                     :preview-disabled="selecting"
-                  >
-                    <template #placeholder>
-                      <div class="variant-preview-loading">加载中…</div>
-                    </template>
-                  </n-image>
+                  />
                 </div>
                 <div class="variant-info">
                   <n-checkbox
@@ -266,7 +268,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref, watch } from 'vue'
+import { computed, h, inject, onMounted, reactive, ref, watch } from 'vue'
 import {
   NButton,
   NCard,
@@ -291,6 +293,7 @@ import {
 } from 'naive-ui'
 import { Icon } from '@iconify/vue'
 import { useBridge } from './composables/useBridge'
+import { themeKey } from './theme'
 
 interface MemeVariant {
   file: string
@@ -307,6 +310,8 @@ const PLUGIN_NAME = 'astrbot_plugin_angel_smile'
 const message = useMessage()
 const themeVars = useThemeVars()
 const { apiGet, apiPost } = useBridge()
+const theme = inject(themeKey)!
+const { isDark, toggle: toggleTheme } = theme
 
 // Naive UI 的主题变量只挂在组件自己的根节点上，自定义类里用到的
 // var(--n-*) 需要在这里显式注入到根容器，否则解析失败。
@@ -328,14 +333,20 @@ const cssVars = computed(() => {
   }
 })
 
-const fallbackImage =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>" +
-      "<rect width='100%' height='100%' fill='#2f3337'/>" +
-      "<text x='50%' y='50%' fill='#80858c' font-size='14' text-anchor='middle' dominant-baseline='middle'>图片缺失</text>" +
-      '</svg>',
+// 图片缺失占位图随主题切换底色
+const fallbackImage = computed(() => {
+  const bg = isDark.value ? '#2c2c2e' : '#e5e5ea'
+  const fg = isDark.value ? '#98989d' : '#8e8e93'
+  return (
+    'data:image/svg+xml;utf8,' +
+    encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'>" +
+        `<rect width='100%' height='100%' fill='${bg}'/>` +
+        `<text x='50%' y='50%' fill='${fg}' font-size='14' text-anchor='middle' dominant-baseline='middle'>图片缺失</text>` +
+        '</svg>',
+    )
   )
+})
 
 const memes = ref<MemeItem[]>([])
 const selectedName = ref<string | null>(null)
@@ -444,23 +455,54 @@ function imageUrl(relative: string): string {
   return imageSrcMap[relative] ?? ''
 }
 
+// 图片就绪才让卡片入列；网格按 currentVariants 原顺序过滤，顺序天然稳定
+const readySet = reactive(new Set<string>())
+
+const visibleVariants = computed(() =>
+  currentVariants.value.filter((v) => readySet.has(v.relative)),
+)
+
+const IMAGE_CONCURRENCY = 16
+
+let loadGeneration = 0
+
 async function loadVariantImages(memeName: string | null) {
+  const gen = ++loadGeneration
+  readySet.clear()
   if (!memeName) return
   const meme = memes.value.find((m) => m.name === memeName)
   if (!meme) return
+
+  // 已有缓存的立即可见，其余并发加载（限流 16）
   for (const v of meme.variants) {
-    if (imageSrcMap[v.relative]) continue
-    try {
-      const data = await apiGet<{ data_url?: string }>('memes/image/b64', {
-        path: v.relative,
-      })
-      if (data?.data_url) {
-        imageSrcMap[v.relative] = data.data_url
+    if (imageSrcMap[v.relative]) readySet.add(v.relative)
+  }
+  const pending = meme.variants.filter((v) => !imageSrcMap[v.relative])
+
+  let cursor = 0
+  const worker = async () => {
+    while (cursor < pending.length) {
+      // 快速切换分组时丢弃过期任务
+      if (gen !== loadGeneration) return
+      const v = pending[cursor++]
+      try {
+        const data = await apiGet<{ data_url?: string }>('memes/image/b64', {
+          path: v.relative,
+        })
+        if (gen !== loadGeneration) return
+        if (data?.data_url) {
+          imageSrcMap[v.relative] = data.data_url
+          readySet.add(v.relative)
+        }
+      } catch (e) {
+        console.warn(`[MemeManage] 图片加载失败: ${v.relative}`, e)
       }
-    } catch (e) {
-      console.warn(`[MemeManage] 图片加载失败: ${v.relative}`, e)
     }
   }
+
+  await Promise.all(
+    Array.from({ length: Math.min(IMAGE_CONCURRENCY, pending.length) }, () => worker()),
+  )
 }
 
 watch(selectedName, (name) => {
@@ -619,6 +661,14 @@ onMounted(async () => {
   height: 100vh;
 }
 
+/* Liquid Glass · thick：侧栏面板（iOS 材质分层中的导航层） */
+.glass-sider {
+  background: var(--glass-thick-bg) !important;
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border-right: 1px solid var(--glass-border);
+}
+
 .sidebar-inner {
   display: flex;
   flex-direction: column;
@@ -628,15 +678,52 @@ onMounted(async () => {
 .sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 10px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--n-divider-color);
+  border-bottom: 1px solid var(--glass-divider);
 }
 
 .brand {
+  flex: 1;
   font-size: 15px;
   font-weight: 600;
   color: var(--n-text-color-1);
+}
+
+/* 左上角主题切换：胶囊玻璃圆钮 */
+.theme-toggle {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  color: inherit;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  background: var(--glass-regular-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.theme-toggle:hover {
+  transform: scale(1.06);
+}
+
+.theme-toggle:active {
+  transform: scale(0.94);
+}
+
+/* 折叠态：56px 宽度放不下横排双按钮，转纵向并收窄内边距 */
+.sidebar-inner.is-collapsed .sidebar-header {
+  flex-direction: column;
+  padding: 10px 8px;
 }
 
 .sidebar-scroll {
@@ -662,7 +749,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   padding: 10px 16px;
-  border-top: 1px solid var(--n-divider-color);
+  border-top: 1px solid var(--glass-divider);
 }
 
 .footer-text {
@@ -685,7 +772,7 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   padding: 20px 28px 12px;
-  border-bottom: 1px solid var(--n-divider-color);
+  border-bottom: 1px solid var(--glass-divider);
 }
 
 .content-title {
@@ -723,17 +810,36 @@ onMounted(async () => {
   padding: 20px 28px;
 }
 
+/* Liquid Glass · regular：内容卡片；图片就绪入列时播进入动画 */
 .variant-card {
   position: relative;
-  background: var(--n-card-color);
-  border: 1px solid var(--n-border-color);
-  border-radius: 8px;
+  background: var(--glass-regular-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
   overflow: hidden;
-  transition: border-color 0.2s;
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+  transition: border-color 0.2s, transform 0.15s ease, box-shadow 0.2s;
+  animation: card-in 0.4s cubic-bezier(0.34, 0.7, 0.3, 1) both;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .variant-card:hover {
   border-color: var(--n-primary-color);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow);
 }
 
 .variant-card.is-selected {
@@ -747,12 +853,14 @@ onMounted(async () => {
 }
 
 .variant-checkbox {
-  flex-shrink: 0;
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
 }
 
 .variant-preview {
   aspect-ratio: 1;
-  background: var(--n-color-1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -766,20 +874,16 @@ onMounted(async () => {
   object-fit: contain;
 }
 
-.variant-preview-loading {
-  font-size: 12px;
-  color: var(--n-text-color-3);
-}
-
 .variant-info {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   padding: 8px 10px;
 }
 
 .variant-name {
-  flex: 1;
+  min-width: 0;
   font-size: 12px;
   color: var(--n-text-color-2);
   white-space: nowrap;
@@ -809,7 +913,7 @@ onMounted(async () => {
   max-width: 100%;
   max-height: 200px;
   object-fit: contain;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .modal-footer {
@@ -818,8 +922,23 @@ onMounted(async () => {
   gap: 8px;
 }
 
-/* 图片放大预览遮罩：默认仅 30% 暗，加深到 85% */
+/* 图片放大预览遮罩：加深 + 毛玻璃 */
 .n-image-preview-container {
-  background-color: rgba(0, 0, 0, 0.85) !important;
+  background-color: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+/* 弹窗卡片：Liquid Glass 大圆角（radius-lg=20，iOS sheet 基准） */
+.n-card,
+.n-modal {
+  border-radius: var(--radius-lg);
+}
+
+.n-card {
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    var(--glass-shadow) !important;
 }
 </style>
