@@ -51,13 +51,58 @@
           />
         </n-scrollbar>
         <div class="sidebar-footer">
-          <span v-if="!collapsed" class="footer-text">{{ memes.length }} 组 · {{ totalVariants }} 个变体</span>
+          <n-menu
+            :value="viewMode === 'settings' ? 'settings' : null"
+            :options="settingsMenuOptions"
+            :collapsed="collapsed"
+            :collapsed-width="56"
+            :collapsed-icon-size="20"
+            @update:value="openSettings"
+          />
         </div>
       </div>
     </n-layout-sider>
 
     <!-- 右侧：选中分组的变体 -->
     <n-layout-content class="content">
+      <!-- 插件设置视图 -->
+      <div v-if="viewMode === 'settings'" class="settings-wrap">
+        <div class="settings-header">
+          <div>
+            <h2>插件设置</h2>
+            <span class="settings-sub">与 AstrBot 原生插件配置页共用同一份数据，保存后即时生效，无需重启</span>
+          </div>
+        </div>
+        <n-scrollbar class="settings-scroll">
+          <SchemaForm
+            v-if="settingsLoaded"
+            :schema="settingsSchema"
+            v-model:model-value="settingsValues"
+            :providers="settingsProviders"
+            class="settings-form"
+          />
+          <n-spin v-else size="small" style="margin-top: 40px" />
+        </n-scrollbar>
+
+        <!-- 悬浮保存按钮：仅存在草稿变更时浮出 -->
+        <Transition name="fab">
+          <n-button
+            v-if="settingsDirty"
+            class="save-fab"
+            type="primary"
+            round
+            size="large"
+            :loading="savingSettings"
+            @click="saveSettings"
+          >
+            <template #icon><Icon icon="lucide:save" /></template>
+            保存更改
+          </n-button>
+        </Transition>
+      </div>
+
+      <!-- 表情库视图 -->
+      <template v-else>
       <div v-if="!selectedName" class="empty-state">
         <n-empty description="从左侧选择一个表情分组查看变体" size="large">
           <template #icon><Icon icon="lucide:sticker" class="empty-icon" /></template>
@@ -157,6 +202,7 @@
             </div>
           </n-scrollbar>
         </div>
+      </template>
       </template>
     </n-layout-content>
 
@@ -268,7 +314,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, inject, onMounted, reactive, ref, watch } from 'vue'
+import { computed, h, inject, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import {
   NButton,
   NCard,
@@ -294,6 +340,8 @@ import {
 import { Icon } from '@iconify/vue'
 import { useBridge } from './composables/useBridge'
 import { themeKey } from './theme'
+import SchemaForm from './SchemaForm.vue'
+import type { SchemaMeta } from './schema'
 
 interface MemeVariant {
   file: string
@@ -351,6 +399,69 @@ const fallbackImage = computed(() => {
 const memes = ref<MemeItem[]>([])
 const selectedName = ref<string | null>(null)
 const collapsed = ref(false)
+// naive-ui 的 n-layout-sider 没有 breakpoint 属性，用 matchMedia 实现窄屏自动收起
+const narrowMql = window.matchMedia('(max-width: 768px)')
+const syncSidebarToWidth = () => {
+  collapsed.value = narrowMql.matches
+}
+onMounted(() => {
+  syncSidebarToWidth()
+  narrowMql.addEventListener('change', syncSidebarToWidth)
+})
+onUnmounted(() => {
+  narrowMql.removeEventListener('change', syncSidebarToWidth)
+})
+
+// ---------- 视图切换（表情库 / 插件设置） ----------
+
+type ViewMode = 'memes' | 'settings'
+const viewMode = ref<ViewMode>('memes')
+
+const settingsSchema = ref<Record<string, SchemaMeta>>({})
+const settingsValues = ref<Record<string, unknown>>({})
+const settingsProviders = ref<Record<string, string[]>>({})
+const settingsLoaded = ref(false)
+const savingSettings = ref(false)
+// 草稿基线：与当前值不一致即有变更，浮出保存按钮
+const settingsBaseline = ref('')
+const settingsDirty = computed(
+  () =>
+    settingsLoaded.value &&
+    JSON.stringify(settingsValues.value) !== settingsBaseline.value,
+)
+
+function openSettings() {
+  viewMode.value = 'settings'
+  if (!settingsLoaded.value) void loadPluginConfig()
+}
+
+async function loadPluginConfig() {
+  try {
+    const data = await apiGet<{
+      schema: Record<string, SchemaMeta>
+      values: Record<string, unknown>
+    }>('plugin_config')
+    settingsSchema.value = data?.schema || {}
+    settingsValues.value = data?.values || {}
+    settingsBaseline.value = JSON.stringify(settingsValues.value)
+    settingsLoaded.value = true
+  } catch (e) {
+    message.error(`加载插件设置失败: ${(e as Error).message}`)
+  }
+}
+
+async function saveSettings() {
+  savingSettings.value = true
+  try {
+    await apiPost('plugin_config/save', { values: settingsValues.value })
+    settingsBaseline.value = JSON.stringify(settingsValues.value)
+    message.success('已保存并即时生效')
+  } catch (e) {
+    message.error(`保存失败: ${(e as Error).message}`)
+  } finally {
+    savingSettings.value = false
+  }
+}
 
 const showUpload = ref(false)
 const showVariantUpload = ref(false)
@@ -374,10 +485,6 @@ const currentVariants = computed(() => currentMeme.value?.variants ?? [])
 
 const variantCount = computed(() => currentVariants.value.length)
 
-const totalVariants = computed(() =>
-  memes.value.reduce((sum, m) => sum + m.variants.length, 0),
-)
-
 // 左侧导航：NMenu，名称 + 变体数标签
 const menuOptions = computed(() =>
   memes.value.map((m) => ({
@@ -395,8 +502,17 @@ const menuOptions = computed(() =>
   })),
 )
 
+const settingsMenuOptions = [
+  {
+    label: '插件设置',
+    key: 'settings',
+    icon: () => h(Icon, { icon: 'lucide:settings' }),
+  },
+]
+
 function selectMeme(name: string) {
   if (selecting.value) exitSelect()
+  viewMode.value = 'memes'
   selectedName.value = name
 }
 
@@ -746,15 +862,66 @@ onMounted(async () => {
 }
 
 .sidebar-footer {
-  display: flex;
-  align-items: center;
-  padding: 10px 16px;
   border-top: 1px solid var(--glass-divider);
 }
 
-.footer-text {
+/* ---------- 插件设置视图 ---------- */
+
+.settings-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 28px 12px;
+  border-bottom: 1px solid var(--glass-divider);
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--n-text-color-1);
+}
+
+.settings-sub {
   font-size: 12px;
   color: var(--n-text-color-3);
+}
+
+.settings-scroll {
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-form {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px 28px 120px;
+}
+
+/* 悬浮保存按钮：右下角浮出 */
+.save-fab {
+  position: fixed;
+  right: 28px;
+  bottom: 28px;
+  z-index: 100;
+  box-shadow: var(--glass-shadow);
+}
+
+.fab-enter-active,
+.fab-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.fab-enter-from,
+.fab-leave-to {
+  opacity: 0;
+  transform: translateY(14px) scale(0.92);
 }
 
 .content {

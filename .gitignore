@@ -4,3 +4,6 @@ __pycache__/
 # WebUI
 webui/node_modules/
 
+
+# PAI 工作资产目录（与 heart 同款规则）
+.*/

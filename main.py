@@ -24,7 +24,6 @@ class AngelSmilePlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.config = context.get_config()
-        self.max_stickers_per_message = self.config.get("max_stickers_per_message", 1)
 
         plugin_dir = Path(__file__).resolve().parent
         data_dir = Path(StarTools.get_data_dir())
@@ -46,7 +45,7 @@ class AngelSmilePlugin(Star):
         try:
             from .web_api import register_all_routes
 
-            register_all_routes(self.context, self.storage, self.manager)
+            register_all_routes(self.context, self.storage, self.manager, plugin=self)
             logger.info("AngelSmile: 已注册表情管理 WebUI API 路由")
         except Exception as e:  # pragma: no cover - 兼容旧版 AstrBot
             logger.warning(f"AngelSmile: WebUI API 路由注册失败（不影响核心功能）: {e}")
@@ -74,7 +73,7 @@ class AngelSmilePlugin(Star):
 错误写法：`:meme名:`、`:贴纸名:`、`:<名字>:`、`:{{名字}}:`（这些都是占位符，不要照抄字面）。
 
 其他规则：
-1. 每条消息最多使用 {self.max_stickers_per_message} 个表情包
+1. 每条消息最多使用 {self.config.get("max_stickers_per_message", 1)} 个表情包
 2. 使用贴纸请克制，仅在闲聊，感情强烈时才使用
 3. 执行任务、给出步骤、写代码、处理严肃问题时，不要使用表情包
 4. 禁止贴纸格式前后加括号

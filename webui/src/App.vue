@@ -55,8 +55,8 @@ body,
 :root[data-theme='light'] {
   --bg-base: #f2f2f7;
   /* 玻璃材质：thick（侧栏/面板）与 regular（控件/卡片） */
-  --glass-thick-bg: rgba(255, 255, 255, 0.66);
-  --glass-regular-bg: rgba(255, 255, 255, 0.3);
+  --glass-thick-bg: rgba(255, 255, 255, 0.95);
+  --glass-regular-bg: rgba(255, 255, 255, 0.6);
   --glass-border: rgba(255, 255, 255, 0.65);
   --glass-highlight: rgba(255, 255, 255, 0.9);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
@@ -71,8 +71,8 @@ body,
 
 :root[data-theme='dark'] {
   --bg-base: #0d0d0f;
-  --glass-thick-bg: rgba(28, 28, 30, 0.62);
-  --glass-regular-bg: rgba(44, 44, 46, 0.32);
+  --glass-thick-bg: rgba(60, 60, 64, 0.92);
+  --glass-regular-bg: rgba(48, 48, 52, 0.6);
   --glass-border: rgba(255, 255, 255, 0.14);
   --glass-highlight: rgba(255, 255, 255, 0.22);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
