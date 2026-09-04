@@ -22,7 +22,6 @@
           <div v-if="!collapsed" class="brand">表情库</div>
           <n-button
             v-if="!collapsed"
-            size="small"
             type="primary"
             @click="openUpload"
           >
@@ -31,7 +30,6 @@
           </n-button>
           <n-button
             v-else
-            size="small"
             type="primary"
             circle
             title="新增"
@@ -81,7 +79,7 @@
             :providers="settingsProviders"
             class="settings-form"
           />
-          <n-spin v-else size="small" style="margin-top: 40px" />
+          <n-spin v-else style="margin-top: 40px" />
         </n-scrollbar>
 
         <!-- 悬浮保存按钮：仅存在草稿变更时浮出 -->
@@ -114,11 +112,11 @@
           <div class="content-header">
             <div class="content-title">
               <h2>{{ selectedName }}</h2>
-              <n-tag size="small" round :bordered="false">{{ variantCount }} 个变体</n-tag>
+              <n-tag round :bordered="false">{{ variantCount }} 个变体</n-tag>
             </div>
             <div class="content-actions" v-if="selecting">
               <span class="select-count">已选 {{ selectedVariants.size }} 项</span>
-              <n-button size="small" @click="exitSelect">取消</n-button>
+              <n-button @click="exitSelect">取消</n-button>
               <n-popconfirm
                 :disabled="selectedVariants.size === 0"
                 @positive-click="batchDelete"
@@ -128,7 +126,6 @@
               >
                 <template #trigger>
                   <n-button
-                    size="small"
                     type="error"
                     :disabled="selectedVariants.size === 0"
                   >
@@ -139,11 +136,11 @@
               </n-popconfirm>
             </div>
             <div class="content-actions" v-else>
-              <n-button size="small" @click="enterSelect">
+              <n-button @click="enterSelect">
                 <template #icon><Icon icon="lucide:trash-2" /></template>
                 批量删除
               </n-button>
-              <n-button size="small" @click="openRename(selectedName)">
+              <n-button @click="openRename(selectedName)">
                 <template #icon><Icon icon="lucide:pencil" /></template>
                 重命名
               </n-button>
@@ -154,11 +151,11 @@
                 negative-text="取消"
               >
                 <template #trigger>
-                  <n-button size="small" type="error">删除分组</n-button>
+                  <n-button type="error">删除分组</n-button>
                 </template>
                 确定删除「{{ selectedName }}」及其全部 {{ variantCount }} 个变体？
               </n-popconfirm>
-              <n-button size="small" type="primary" @click="openVariantUpload">
+              <n-button type="primary" @click="openVariantUpload">
                 <template #icon><Icon icon="lucide:upload" /></template>
                 添加变体
               </n-button>
@@ -185,7 +182,6 @@
                 <div class="variant-info">
                   <n-checkbox
                     v-if="selecting"
-                    size="small"
                     class="variant-checkbox"
                     :checked="isSelected(v.relative)"
                     @click.stop
@@ -777,12 +773,10 @@ onMounted(async () => {
   height: 100vh;
 }
 
-/* Liquid Glass · thick：侧栏面板（iOS 材质分层中的导航层） */
+/* 侧栏面板：近实色底 + 分隔边框 */
 .glass-sider {
-  background: var(--glass-thick-bg) !important;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border-right: 1px solid var(--glass-border);
+  background: var(--glass-thick-bg);
+  border-right: 1px solid var(--glass-divider);
 }
 
 .sidebar-inner {
@@ -806,7 +800,7 @@ onMounted(async () => {
   color: var(--n-text-color-1);
 }
 
-/* 左上角主题切换：胶囊玻璃圆钮 */
+/* 左上角主题切换：胶囊圆钮 */
 .theme-toggle {
   flex-shrink: 0;
   width: 34px;
@@ -814,13 +808,11 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 17px;
+  font-size: 16px;
   color: inherit;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
   background: var(--glass-regular-bg);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     var(--glass-shadow);
@@ -884,7 +876,7 @@ onMounted(async () => {
 
 .settings-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   color: var(--n-text-color-1);
 }
 
@@ -949,7 +941,7 @@ onMounted(async () => {
 }
 
 .content-title h2 {
-  font-size: 18px;
+  font-size: 16px;
   margin: 0;
   color: var(--n-text-color-1);
 }
@@ -961,7 +953,7 @@ onMounted(async () => {
 }
 
 .select-count {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--n-text-color-2);
 }
 
@@ -977,12 +969,10 @@ onMounted(async () => {
   padding: 20px 28px;
 }
 
-/* Liquid Glass · regular：内容卡片；图片就绪入列时播进入动画 */
+/* 内容卡片：近实色底；图片就绪入列时播进入动画 */
 .variant-card {
   position: relative;
-  background: var(--glass-regular-bg);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: var(--glass-thick-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -1089,23 +1079,11 @@ onMounted(async () => {
   gap: 8px;
 }
 
-/* 图片放大预览遮罩：加深 + 毛玻璃 */
-.n-image-preview-container {
-  background-color: rgba(0, 0, 0, 0.55) !important;
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-}
+/* 图片放大预览遮罩：走 naive-ui 默认效果 */
 
-/* 弹窗卡片：Liquid Glass 大圆角（radius-lg=20，iOS sheet 基准） */
+/* 弹窗卡片：大圆角 */
 .n-card,
 .n-modal {
   border-radius: var(--radius-lg);
-}
-
-.n-card {
-  border: 1px solid var(--glass-border);
-  box-shadow:
-    inset 0 1px 0 var(--glass-highlight),
-    var(--glass-shadow) !important;
 }
 </style>

@@ -5,6 +5,7 @@
     :locale="zhCN"
     :date-locale="dateZhCN"
   >
+    <n-global-style />
     <n-message-provider>
       <n-dialog-provider>
         <meme-manage-panel />
@@ -18,6 +19,7 @@ import { computed, provide, watchEffect } from 'vue'
 import {
   NConfigProvider,
   NDialogProvider,
+  NGlobalStyle,
   NMessageProvider,
   darkTheme,
   dateZhCN,
@@ -50,18 +52,21 @@ body,
     'Microsoft YaHei', sans-serif;
 }
 
-/* ---------- Liquid Glass 设计令牌（iOS 26 基准） ---------- */
+/* ---------- 设计令牌（与 theme.ts tokens 对齐，供自定义元素使用） ---------- */
 
 :root[data-theme='light'] {
-  --bg-base: #f2f2f7;
-  /* 玻璃材质：thick（侧栏/面板）与 regular（控件/卡片） */
-  --glass-thick-bg: rgba(255, 255, 255, 0.95);
-  --glass-regular-bg: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.65);
+  --bg-base: #F5F5F5;
+  --glass-thick-bg: #ffffff;
+  --glass-regular-bg: #ffffff;
+  --glass-border: rgba(60, 60, 67, 0.12);
   --glass-highlight: rgba(255, 255, 255, 0.9);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
   --glass-divider: rgba(60, 60, 67, 0.12);
-  /* 圆角体系 */
+  --accent: #007aff;
+  --accent-soft: rgba(0, 122, 255, 0.12);
+  --text-1: #1d1d1f;
+  --text-2: #6e6e73;
+  --text-3: #8e8e93;
   --radius-xs: 8px;
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -70,13 +75,18 @@ body,
 }
 
 :root[data-theme='dark'] {
-  --bg-base: #0d0d0f;
-  --glass-thick-bg: rgba(60, 60, 64, 0.92);
-  --glass-regular-bg: rgba(48, 48, 52, 0.6);
-  --glass-border: rgba(255, 255, 255, 0.14);
+  --bg-base: #101014;
+  --glass-thick-bg: #18181c;
+  --glass-regular-bg: #18181c;
+  --glass-border: rgba(84, 84, 88, 0.4);
   --glass-highlight: rgba(255, 255, 255, 0.22);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   --glass-divider: rgba(84, 84, 88, 0.4);
+  --accent: #0a84ff;
+  --accent-soft: rgba(10, 132, 255, 0.18);
+  --text-1: #f5f5f7;
+  --text-2: #aeaeb2;
+  --text-3: #8e8e93;
   --radius-xs: 8px;
   --radius-sm: 10px;
   --radius-md: 14px;
@@ -88,34 +98,14 @@ body {
   background: var(--bg-base);
 }
 
-/* 环境光斑：给玻璃提供可折射的色彩层。固定在背景，不参与交互。 */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(42% 36% at 12% 8%, rgba(10, 132, 255, 0.16), transparent 70%),
-    radial-gradient(38% 32% at 92% 16%, rgba(94, 92, 230, 0.13), transparent 70%),
-    radial-gradient(46% 40% at 55% 100%, rgba(255, 55, 95, 0.08), transparent 72%);
-}
-
-:root[data-theme='dark'] body::before {
-  background:
-    radial-gradient(42% 36% at 12% 8%, rgba(10, 132, 255, 0.2), transparent 70%),
-    radial-gradient(38% 32% at 92% 16%, rgba(191, 90, 242, 0.14), transparent 70%),
-    radial-gradient(46% 40% at 55% 100%, rgba(100, 210, 255, 0.07), transparent 72%);
-}
-
 #app {
   position: relative;
   z-index: 1;
 }
 
-/* default 型按钮的玻璃胶囊折射层（Button 无 blur token，全局补） */
-.n-button.n-button--default-type {
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+/* 弹窗卡片：大圆角 */
+.n-card,
+.n-modal {
+  border-radius: var(--radius-lg);
 }
 </style>
