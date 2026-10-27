@@ -102,5 +102,12 @@ export function useBridge() {
     return (json?.data ?? json) as T
   }
 
-  return { init, apiGet, apiPost }
+  async function upload<T = unknown>(endpoint: string, file: File): Promise<T> {
+    if (!bridge) {
+      throw new Error('当前 AstrBot 版本不支持插件上传')
+    }
+    return (await bridge.upload(endpoint, file)) as T
+  }
+
+  return { init, apiGet, apiPost, upload }
 }
