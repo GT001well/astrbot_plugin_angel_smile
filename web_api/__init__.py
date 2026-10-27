@@ -208,7 +208,11 @@ class MemeAPI:
         tmp_dir = self.storage.paths.data_dir / "upload_tmp"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         tmp = tmp_dir / f"upload_{uuid.uuid4().hex}{suffix}"
-        await upload.save(str(tmp))
+        try:
+            await upload.save(str(tmp))
+        except Exception:
+            tmp.unlink(missing_ok=True)
+            raise
         return tmp
 
     # ---------- 删除 ----------
