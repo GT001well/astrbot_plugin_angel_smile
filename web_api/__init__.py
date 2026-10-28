@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -17,7 +16,7 @@ from astrbot.api.web import (
     request,
 )
 
-logger = logging.getLogger(__name__)
+from astrbot.api import logger
 
 
 def _ok(data: Any = None, message: str = "") -> Any:
